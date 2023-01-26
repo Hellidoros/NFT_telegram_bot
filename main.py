@@ -7,8 +7,6 @@ client = TonlibClient()
 TonlibClient.enable_unaudited_binaries()
 client.init_tonlib()
 
-key = None
-
 account = client.find_account('EQCEXDQWeqjLP4BehKzzwbuRBsxQHVwEa9j4MGunBs1Vkg_w')
 account.get_balance()
 print(account.get_balance())
