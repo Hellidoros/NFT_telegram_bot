@@ -12,8 +12,7 @@ print(account.get_balance())
 print(account.get_nft_data())
 print(account.detect_type())
 
-word_list = 'drift release sudden crew swear together garden verify amount master smoke daughter ' \
-            'field faint kingdom arrange refuse slender require chalk rocket number often wedding'
+word_list = '...'
 
 wallet = client.import_wallet(word_list, source='v3r2', workchain_id=0, wallet_id=0)
 print(wallet.address)
