@@ -1,4 +1,5 @@
 from ton.sync import TonlibClient
+import asyncio
 
 address = 'EQCpKU1FZRK7qTsLMNMzuLOrBc-M5-YEXfIHsQ0BsxZSXlRL'
 
@@ -21,13 +22,11 @@ print(wallet.address)
 # Test account 2
 account_to_send = 'UQDMReg6wG5YLrtIQ1JKEBbcwEaP8M91_BLWtLVeP7AV2iJb'
 
+
 # Transfer 0.1 nft
 
 # wallet.transfer(account_to_send, client.to_nano(0.1), comment='test')
 
-
-async def send_nft(account_to_transfer):
-    try:
-        await wallet.transfer(account_to_transfer, client.to_nano(0.1), comment='test')
-    except Exception as e:
-        print(repr(e))
+async def send_nft_async(account_to_transfer):
+    await wallet.transfer(account_to_transfer, client.to_nano(0.01), comment='test')
+    print('Success')

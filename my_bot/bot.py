@@ -1,26 +1,49 @@
-import telebot
+import stat
+
 import my_bot.config as config
 import my_bot.wallet as ton
 from telebot import types
 import asyncio
 import random
 
-bot = telebot.TeleBot(config.TOKEN)
+# Logging module
+import logging
 
-bot.set_my_commands(
-   commands=[
-      telebot.types.BotCommand('/start', 'description for name1'),
-      telebot.types.BotCommand('/help', 'description for name2'),
-      telebot.types.BotCommand('/getnft', 'description for name3')
-   ],
-)
+# Aiogram imports
+from aiogram import Bot, Dispatcher, types
+from aiogram.dispatcher.filters import Text
+from aiogram.types import ParseMode, ReplyKeyboardMarkup, KeyboardButton, \
+    InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
+from aiogram.utils import executor
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
 
+logging.basicConfig(level=logging.INFO)
+bot = Bot(token=config.BOT_TOKEN, parse_mode=types.ParseMode.HTML)
+dp = Dispatcher(bot, storage=MemoryStorage())
+
+
+class DataInput(StatesGroup):
+    firstState = State()
+    secondState = State()
+    WalletState = State()
+    PayState = State()
+
+
+# commands_set_bool = await bot.set_my_commands(
+#     commands=[
+#         BotCommand('/start', 'description for name1'),
+#         BotCommand('/help', 'description for name2'),
+#         BotCommand('/getnft', 'description for name3')
+#     ],
+# )
 
 account_to_transfer = ''
 
 
-@bot.message_handler(commands=['start'])
-def welcome(message):
+@dp.message_handler(commands=['start'], state='*')
+async def welcome(message: types.Message):
     # Keyboard
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1 = types.KeyboardButton("Home")
@@ -28,21 +51,20 @@ def welcome(message):
 
     markup.add(item1, item2)
 
-    bot.send_message(message.chat.id, "Welcome {0.first_name}!\n  I'm NFT project named - <b> {1.first_name} </b> Here "
-                                      "you can get your free NFT token!".format(message.from_user, bot.get_me()),
-                     parse_mode='html', reply_markup=markup)
+    await message.answer("Welcome {0.first_name}!\n  I'm NFT project named - <b> {1.first_name} </b> Here "
+                         "you can get your free NFT token!".format(message.from_user, await bot.get_me()),
+                         reply_markup=markup,
+                         parse_mode=ParseMode.HTML)
+    await DataInput.firstState.set()
 
 
-@bot.message_handler(commands=['help'])
-def help_command(message):
-    keyboard = telebot.types.InlineKeyboardMarkup()
+@dp.message_handler(commands=['help'], state='*')
+async def help_command(message: types.Message):
+    keyboard = InlineKeyboardMarkup()
     keyboard.add(
-        telebot.types.InlineKeyboardButton(
-            'Message the developer', url='telegram.me/artiomtb'
-        )
+        InlineKeyboardButton('Message the developer', url='telegram.me/artiomtb')
     )
-    bot.send_message(
-        message.chat.id,
+    await message.answer(
         '1) To receive a list of available currencies press /exchange.\n' +
         '2) Click on the currency you are interested in.\n' +
         '3) You will receive a message containing information regarding the source and the target currencies, ' +
@@ -54,53 +76,60 @@ def help_command(message):
     )
 
 
-@bot.message_handler(content_types=['text'])
-def get_user_wallet(message):
-    if message.chat.type == 'private':
-        if message.text == 'Get NFT':
-            msg = bot.send_message(message.from_user.id, 'Enter Wallet address:')
-            bot.register_next_step_handler(msg, check_user_wallet)
-        if message.text == 'Home':
-            bot.send_message(message.chat.id,
-                             "Welcome {0.first_name}!\n  I'm NFT project named - <b> {1.first_name} </b> Here "
-                             "you can get your free NFT token!".format(message.from_user, bot.get_me()),
-                             parse_mode='html')
-
-        # elif message.text == 'Home':
-        #     bot.send_message(message.chat.id, 'Hello world')
+@dp.message_handler(commands=['cancel'], state="*")
+async def cmd_cancel(message: types.Message):
+    await message.answer("Canceled")
+    await message.answer("/start to restart")
+    await DataInput.firstState.set()
 
 
-def check_user_wallet(message):
-    account_to_transfer = message.text
-    bot.send_message(message.chat.id, message.text)
-
-    markup = types.InlineKeyboardMarkup(row_width=2)
-
-    item1 = types.InlineKeyboardButton("Correct", callback_data='correct')
-    item2 = types.InlineKeyboardButton("Incorrect", callback_data='incorrect')
-
-    markup.add(item1, item2)
-
-    bot.send_message(message.from_user.id, 'Check you wallet number!', reply_markup=markup)
+@dp.message_handler(commands=['getnft'], state=DataInput.firstState)
+async def return_home(message: types.Message, state: FSMContext):
+    await DataInput.secondState.set()
+    await message.answer('Enter Wallet address:')
 
 
-@bot.callback_query_handler(func=lambda call: True)
-def callback_inline(call):
-    try:
-        if call.message:
-            if call.data == 'correct':
-                bot.send_message(call.message.chat.id, 'Nice sending NFT')
-                return asyncio.run(ton.send_nft(account_to_transfer))
-            elif call.data == 'incorrect':
-                bot.send_message(call.message.chat.id, 'Retype your wallet number')
-                msg = bot.send_message(call.message.chat.id, 'Enter Wallet address:')
-                bot.register_next_step_handler(msg, check_user_wallet)
-            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                  text="Check you wallet number!",
-                                  reply_markup=None)
+@dp.message_handler(state=DataInput.secondState)
+async def check_user_wallet(message: types.Message, state: FSMContext):
+    if len(message.text) == 48:
+        markup = InlineKeyboardMarkup(row_width=2)
 
-    except Exception as e:
-        print(repr(e))
+        item1 = InlineKeyboardButton("Correct", callback_data='correct')
+        item2 = InlineKeyboardButton("Incorrect", callback_data='incorrect')
+
+        markup.add(item1, item2)
+
+        await message.reply('Check you wallet number!', reply_markup=markup)
+    else:
+        await message.answer("Wrong wallet address")
+        await DataInput.firstState().set()
+
+
+@dp.callback_query_handler(lambda call: True, state="*")
+async def send_nft(call: types.CallbackQuery, state: FSMContext):
+    if call.data == 'correct':
+        await call.answer('Nice sending NFT')
+        await call.message.answer('Nice sending NFT')
+
+
+# @dp.callback_query_handler(func=lambda call: True)
+# async def callback_inline(call: types.callback_query):
+#     try:
+#         if call.message:
+#             if call.data == 'correct':
+#                 await message.answer(call.message.chat.id, 'Nice sending NFT')
+#                 return asyncio.run(ton.send_nft_async(account_to_transfer))
+#             elif call.data == 'incorrect':
+#                 await message.answer(call.message.chat.id, 'Retype your wallet number')
+#                 msg = bot.send_message(call.message.chat.id, 'Enter Wallet address:')
+#                 bot.register_next_step_handler(msg, check_user_wallet)
+#             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+#                                   text="Check you wallet number!",
+#                                   reply_markup=None)
+#
+#     except Exception as e:
+#         print(repr(e))
+
 
 # asyncio.get_event_loop().run_until_complete(ton.send_nft(account_to_transfer))
 
@@ -112,4 +141,8 @@ def callback_inline(call):
 #     except Exception as e:
 #         print(repr(e))
 
-bot.polling()
+if __name__ == '__main__':
+    # Create Aiogram executor for our bot
+    executor.start_polling(dp)
+
+    # Launch the deposit waiter with our executor
