@@ -42,7 +42,7 @@ class DataInput(StatesGroup):
 account_to_transfer = ''
 
 
-@dp.message_handler(commands=['start'], state='*')
+@dp.message_handler(commands=['start'])
 async def welcome(message: types.Message):
     # Keyboard
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -71,9 +71,10 @@ async def help_command(message: types.Message):
         'buying rates and selling rates.\n' +
         '4) Click “Update” to receive the current information regarding the request. ' +
         'The bot will also show the difference between the previous and the current exchange rates.\n' +
-        '5) The bot supports inline. Type @<botusername> in any chat and the first letters of a currency.',
-        reply_markup=keyboard
+        '5) The bot supports inline. Type in any chat and the first letters of a currency.',
+        reply_markup=keyboard, parse_mode=ParseMode.HTML
     )
+
 
 
 @dp.message_handler(commands=['cancel'], state="*")
@@ -83,10 +84,13 @@ async def cmd_cancel(message: types.Message):
     await DataInput.firstState.set()
 
 
-@dp.message_handler(commands=['getnft'], state=DataInput.firstState)
+@dp.message_handler(commands=['getnft'], content_types='text', state=DataInput.firstState)
 async def return_home(message: types.Message, state: FSMContext):
     await DataInput.secondState.set()
     await message.answer('Enter Wallet address:')
+    if message.text == 'Get NFT':
+        await DataInput.secondState.set()
+        await message.answer('Enter Wallet address:')
 
 
 @dp.message_handler(state=DataInput.secondState)
@@ -143,6 +147,6 @@ async def send_nft(call: types.CallbackQuery, state: FSMContext):
 
 if __name__ == '__main__':
     # Create Aiogram executor for our bot
-    executor.start_polling(dp)
+    executor.start_polling(dp, skip_updates=True)
 
     # Launch the deposit waiter with our executor
