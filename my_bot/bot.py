@@ -39,8 +39,6 @@ class DataInput(StatesGroup):
 #     ],
 # )
 
-account_to_transfer = ''
-
 
 @dp.message_handler(commands=['start'])
 async def welcome(message: types.Message):
@@ -76,7 +74,6 @@ async def help_command(message: types.Message):
     )
 
 
-
 @dp.message_handler(commands=['cancel'], state="*")
 async def cmd_cancel(message: types.Message):
     await message.answer("Canceled")
@@ -96,6 +93,7 @@ async def return_home(message: types.Message, state: FSMContext):
 @dp.message_handler(state=DataInput.secondState)
 async def check_user_wallet(message: types.Message, state: FSMContext):
     if len(message.text) == 48:
+        ton.account_to_send = message.text
         markup = InlineKeyboardMarkup(row_width=2)
 
         item1 = InlineKeyboardButton("Correct", callback_data='correct')
@@ -106,7 +104,7 @@ async def check_user_wallet(message: types.Message, state: FSMContext):
         await message.reply('Check you wallet number!', reply_markup=markup)
     else:
         await message.answer("Wrong wallet address")
-        await DataInput.firstState().set()
+        await DataInput.firstState.set()
 
 
 @dp.callback_query_handler(lambda call: True, state="*")
@@ -114,6 +112,7 @@ async def send_nft(call: types.CallbackQuery, state: FSMContext):
     if call.data == 'correct':
         await call.answer('Nice sending NFT')
         await call.message.answer('Nice sending NFT')
+        await ton.send_nft_async(ton.account_to_send)
 
 
 # @dp.callback_query_handler(func=lambda call: True)
